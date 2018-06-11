@@ -1,5 +1,5 @@
 
-# Docker
+# Docker Commands
 
 ## Docker Info
 
@@ -198,3 +198,89 @@ $ docker container attach sample
 $ ← コンテナは起動したまま/bin/bashのみ削除
 $ docker container ls 
 ```
+
+## 稼働コンテナでプロセス
+
+```
+docker container exec [オプション] コンテナ識別子 実行するコマンド
+```
+
+```
+$ docker container exec -it webserver /bin/echo "Hello world"
+```
+
+## 稼働コンテナのポート転送確認
+
+```
+$ docker container port webserver
+80/tcp -> 0.0.0.0:80
+```
+
+## コンテナからホストへのファイルコピー
+
+```
+$ docker container cp webserver:/etc/nginx/nginx.conf /tmp/nginx.conf
+```
+
+## ホストからコンテナへのファイルコピー
+
+```
+$ docker container cp ./test.txt webserver:/tmp/test.txt
+```
+
+## コンテナからイメージを作成
+
+```
+$ docker container commit -a "ASA SHIHO" webserver asashiho/webfront:1.0
+```
+
+上記はwebserverという名前のコンテナをasashiho/webfrontという名前のイメージ名でタグ名を1.0に指定してイメージを作成する。
+
+## コンテナをtarファイル出力
+
+```
+$ docker container export webserver > latest.tar
+```
+
+## Linux OSイメージディレクトリからDockerイメージ作成
+
+```
+docker image import ファイルまたはURL - [イメージ名[:タグ名]]
+```
+
+## Dockerイメージをtarファイルに保存
+
+```
+docker image save [オプション] 保存ファイル名 [イメージ名]
+```
+
+## tarファイルからイメージを生成
+
+```
+docker image load -i export.tar
+```
+
+> `docker container export`コマンドで作成したものを読み込むときは`docker image import`コマンド、`docker image save`コマンドで生成したものを読み込むときは`docker image load`コマンドを使うこと
+
+## 不要なイメージ/コンテナを一括削除
+
+docker system pruneコマンドを使うと、使用していないイメージ・コンテナ・ボリューム・ネットワークを一括で削除できる。
+
+```
+docker system prune [オプション]
+```
+
+# Dockerfile
+
+Dockerfileでは以下の情報を記述する
+
+* ベースになるDockerイメージ
+* Dockerコンテナ内で行った捜査(コマンド)
+* 環境変数などの設定
+* Dockerコンテナ内で動作させておくデーモン実行
+
+
+| 命令  | 説明  |
+|---|---|
+| FROM  | ベースイメージの指定  |
+| RUN  |  コマンド実行  |
