@@ -88,7 +88,7 @@ $ docker container run -it --env-file=env_list centos /bin/bash
 $ docker container run -it -w=/tensorflow centos /bin/bash
 
 [root@aaaaaa work]# pwd
-/tensorflow 
+/tensorflow
 ```
 
 ## 稼働コンテナの一覧表示
@@ -196,7 +196,7 @@ $ docker container attach sample
 [root@aaaaaaa /]# ← ここで[Ctrl]+[P] [Ctrl]+[Q]を入力
 
 $ ← コンテナは起動したまま/bin/bashのみ削除
-$ docker container ls 
+$ docker container ls
 ```
 
 ## 稼働コンテナでプロセス
@@ -279,8 +279,145 @@ Dockerfileでは以下の情報を記述する
 * 環境変数などの設定
 * Dockerコンテナ内で動作させておくデーモン実行
 
+> Dockerfileでの主な命令
 
-| 命令  | 説明  |
+| 命令 | 説明 |
 |---|---|
-| FROM  | ベースイメージの指定  |
-| RUN  |  コマンド実行  |
+| FROM | ベースイメージの指定  |
+| RUN |  コマンド実行  |
+| CMD |  コンテナの実行コマンド |
+| LABEL | ラベルを設定 |
+| EXPOSE | ポートのエクスポート|
+| ENV | 環境変数 |
+| ADD | ファイル/ディレクトリの追加 |
+| COPY | ファイルのコピー |
+| ENTRYPOINT | コンテナの実行コマンド |
+| VOLUME | ボリュームのマウント |
+| USER | ユーザーの指定 |
+| WORKDIR | 作業ディレクトリ |
+| ARG | Dockerfile内の変数 |
+| ONBUILD | ビルド完了後に実行される命令 |
+| STOPSIGNAL | システムコールシグナルの設定 |
+| HEALTHCHECK | コンテナのヘルスチェック |
+| SHELL | デフォルトシェルの設定 |
+
+## Dockerfileのビルドとイメージレイヤー
+
+> Dockerfileをビルドすることで、Dockerfileに定義した構成に基づくDockerイメージを作成できます。
+
+Dockerfileの内容
+
+```
+FROM centos:centos7
+```
+
+> 上記Dockerファイルからsampleというイメージを作成する
+
+```
+docker build -t sample:1.0 /home/docker/sample
+```
+
+## Docker イメージの確認
+
+```
+$ docker image ls
+REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+sample              1.0                 49f7960eb7e4        12 days ago         200MB
+centos              centos7             49f7960eb7e4        12 days ago         200MB
+```
+
+> IMAGE IDが同じイメージは実体は同じもの
+
+## Dockerイメージのレイヤー構造
+
+```
+# STEP:1 Ubuntu (Base image)
+FROM ubuntu:latest
+
+# STEP:2 Install Nginx
+RUN apt-get update && apt-get install -y -q nginx
+
+# STEP:3 Copy file
+COPY index.html /usr/share/nginx/html/
+
+# STEP:4 RUN Nginx
+CMD [ "nginx", "-g", "daemon off;"]
+```
+
+```
+$ docker build -t webap .
+#(中略)
+Step 3/4 : COPY index.html /usr/share/nginx/html/
+ ---> 5c91bfa5c372
+Step 4/4 : CMD [ "nginx", "-g", "daemon off;"]
+ ---> Running in 856b02f94de6
+Removing intermediate container 856b02f94de6
+ ---> ae24672bae20
+Successfully built ae24672bae20
+Successfully tagged webap:latest
+```
+
+> ログを確認すると、Dockerfileの命令1行ごとにイメージが生成されているのがわかります。
+> イメージを積み重ねることでDockerでは、ディスクの容量を効率よく利用します。
+
+## マルチステージングビルドによるアプリケーション開発
+
+> DockerにはアプリケーションをビルドするためのDockerイメージと、プロダクション環境で実際に動作させるDockerイメージを同時に作成できる機能があります。これをマルチステージビルドと読んでいます。
+> これにより実行バイナリだけをプロダクション環境用の軽量なイメージ組み込めます。
+
+詳細は以下GitHubリンク先のDockerfileをビルド&実行すれば下記のように本番用イメージでアプリケーションが動くことが確認できる。
+
+https://github.com/asashiho/dockertext2/tree/master/chap05/multi-stage
+
+```
+$ docker container run -it --rm greet momotaro98
+Hello momotaro98
+```
+
+## デーモンの実行 (RUN / ENTRYPOINT)
+
+> RUN命令はイメージを作成するために実行するコマンドを記述しますが、イメージをもとに生成したコンテナ内でコマンドを実行するには、CMD命令を使います。Dockerfileには、1つのCMD命令を記述することができます。もし複数指定したいときは、最後のコマンドのみが有効になります。
+
+ENTRYPOINT命令とCMD命令の組み合わせの例
+
+```
+# Get Docker image
+FROM ubuntu:16.04
+
+# EXEC top command
+ENTRYPOINT ["top"]
+CMD ["-d", "10"]
+```
+
+> 上記Dockerfileをもとにsampleというイメージを作成して、docker container runコマンドをを実行したときの例は以下になります。
+
+```
+CMD命令で指定した10秒ごとに更新する場合(デフォルト)
+$ docker container run -it sample
+
+2秒ごとに更新する場合
+$ docker container run -it sample -d 2
+```
+
+## ビルド完了後に実行される命令(ONBUILD命令)
+
+> ONBUILD命令は、__次のビルド__で実行するコマンドをイメージ内に設定するための命令です。
+
+```base-docker-file-with-ONBUILD
+# Setting of base image
+FROM ubuntu:latest
+
+# Nginxのインストール
+RUN apt-get -y update && apt-get -y upgrade
+RUN apt-get -y install nginx
+
+# ポート指定
+EXPOSE 80
+
+# Web コンテンツの配置
+ONBUILD ADD website.tar /var/www/html/
+
+# Nginxの実行
+CMD ["nginx", "-g", "daemon off;"]
+```
+
